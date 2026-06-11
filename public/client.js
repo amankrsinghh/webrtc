@@ -327,13 +327,22 @@ async function handleSDPOffer(sdp) {
   peerConnection.ontrack = (event) => {
     logEvent('Received remote video/audio track stream from host.', 'success');
     const remoteVideo = document.getElementById('remote-video');
-    remoteVideo.srcObject = event.streams[0];
+    
+    // Robust fallback for stream assignment
+    if (event.streams && event.streams[0]) {
+      remoteVideo.srcObject = event.streams[0];
+    } else {
+      if (!remoteVideo.srcObject) {
+        remoteVideo.srcObject = new MediaStream();
+      }
+      remoteVideo.srcObject.addTrack(event.track);
+    }
     
     // Hide loading screen, enable play controls
     document.getElementById('viewer-placeholder').style.display = 'none';
     document.getElementById('viewer-play').disabled = false;
     
-    // Attempt automatic playback
+    // Attempt automatic playback (since it starts muted, this should succeed)
     remoteVideo.play()
       .then(() => {
         logEvent('Live stream audio/video playing.', 'success');
@@ -418,6 +427,12 @@ function setupViewerUIControls() {
   const muteBtn = document.getElementById('viewer-mute');
   const fullscreenBtn = document.getElementById('viewer-fullscreen');
   const remoteVideo = document.getElementById('remote-video');
+
+  // Initialize UI controls to reflect muted autoplay
+  remoteVideo.muted = true;
+  muteBtn.classList.add('active-off');
+  muteBtn.querySelector('.icon-on').style.display = 'none';
+  muteBtn.querySelector('.icon-off').style.display = 'block';
 
   playBtn.addEventListener('click', () => {
     if (remoteVideo.paused) {
