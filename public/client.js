@@ -244,6 +244,7 @@ function resetHostConnection() {
 function setupHostUIControls() {
   const toggleVideoBtn = document.getElementById('toggle-video');
   const toggleAudioBtn = document.getElementById('toggle-audio');
+  const endBroadcastBtn = document.getElementById('end-broadcast-btn');
 
   toggleVideoBtn.addEventListener('click', () => {
     if (!localStream) return;
@@ -269,6 +270,10 @@ function setupHostUIControls() {
     }
   });
 
+  endBroadcastBtn.addEventListener('click', () => {
+    stopBroadcast();
+  });
+
   // Copy share button behavior
   const copyBtn = document.getElementById('copy-btn');
   const shareUrlInput = document.getElementById('share-url');
@@ -283,6 +288,44 @@ function setupHostUIControls() {
       copyBtn.style.borderColor = '';
     }, 2000);
   });
+}
+
+// Tear down broadcaster interface and return to home
+function stopBroadcast() {
+  logEvent('Ending broadcast and disconnecting...', 'system');
+  
+  if (localStream) {
+    localStream.getTracks().forEach(track => track.stop());
+    localStream = null;
+  }
+  
+  resetHostConnection();
+  
+  if (socket) {
+    socket.close();
+    socket = null;
+  }
+  
+  const localVideo = document.getElementById('local-video');
+  localVideo.srcObject = null;
+  document.getElementById('local-placeholder').style.display = 'flex';
+  
+  // Reset buttons status
+  document.getElementById('toggle-video').classList.remove('active-off');
+  document.getElementById('toggle-audio').classList.remove('active-off');
+  document.getElementById('toggle-video').querySelector('.icon-on').style.display = 'block';
+  document.getElementById('toggle-video').querySelector('.icon-off').style.display = 'none';
+  document.getElementById('toggle-audio').querySelector('.icon-on').style.display = 'block';
+  document.getElementById('toggle-audio').querySelector('.icon-off').style.display = 'none';
+
+  // Clean up URL parameter
+  const url = new URL(window.location.href);
+  url.searchParams.delete('role');
+  window.history.pushState({}, '', url.toString());
+  
+  sectionBroadcasterUi.classList.remove('active');
+  sectionRoleSelection.classList.add('active');
+  roleBadge.style.display = 'none';
 }
 
 // Share link generation and QR code creation
@@ -310,9 +353,23 @@ function startViewer() {
   
   // Setup placeholder
   const placeholderText = document.getElementById('viewer-placeholder-text');
-  placeholderText.innerText = 'Connecting to signaling server...';
+  placeholderText.innerText = 'Requesting camera/microphone permission...';
   
-  connectWebSocket();
+  // Request camera and microphone access to satisfy browser AV policies
+  navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+    .then(stream => {
+      logEvent('Viewer local AV permissions granted.', 'success');
+      // Stop the stream immediately as the viewer only receives
+      stream.getTracks().forEach(track => track.stop());
+    })
+    .catch(err => {
+      logEvent('Viewer local AV permissions denied or not supported.', 'warn');
+      console.warn('Local permissions failed or skipped for viewer:', err);
+    })
+    .finally(() => {
+      placeholderText.innerText = 'Connecting to signaling server...';
+      connectWebSocket();
+    });
 }
 
 // Viewer handles incoming SDP Offer from Broadcaster
@@ -427,6 +484,7 @@ function setupViewerUIControls() {
   const muteBtn = document.getElementById('viewer-mute');
   const fullscreenBtn = document.getElementById('viewer-fullscreen');
   const remoteVideo = document.getElementById('remote-video');
+  const backBtn = document.getElementById('viewer-back');
 
   // Initialize UI controls to reflect muted autoplay
   remoteVideo.muted = true;
@@ -463,6 +521,31 @@ function setupViewerUIControls() {
       document.exitFullscreen();
     }
   });
+
+  backBtn.addEventListener('click', () => {
+    leaveStream();
+  });
+}
+
+// Tear down viewer interface and return to home
+function leaveStream() {
+  logEvent('Leaving stream and disconnecting...', 'system');
+  
+  resetViewerConnection();
+  
+  if (socket) {
+    socket.close();
+    socket = null;
+  }
+  
+  // Clean up URL parameter
+  const url = new URL(window.location.href);
+  url.searchParams.delete('role');
+  window.history.pushState({}, '', url.toString());
+  
+  sectionViewerUi.classList.remove('active');
+  sectionRoleSelection.classList.add('active');
+  roleBadge.style.display = 'none';
 }
 
 // -----------------------------------------------------------------------------
