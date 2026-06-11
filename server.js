@@ -16,6 +16,17 @@ app.use(express.static(path.join(__dirname, 'public')));
 let broadcaster = null;
 let viewer = null;
 
+// Safe send helper to prevent server crashes if a socket closes mid-handshake
+function safeSend(ws, data) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    try {
+      ws.send(JSON.stringify(data));
+    } catch (err) {
+      console.error('Failed to send message over WebSocket:', err);
+    }
+  }
+}
+
 wss.on('connection', (ws) => {
   let userRole = null;
   console.log('New WebSocket connection established.');
@@ -30,7 +41,7 @@ wss.on('connection', (ws) => {
           if (userRole === 'broadcaster') {
             if (broadcaster) {
               console.log('Broadcaster re-registered. Disconnecting old broadcaster.');
-              broadcaster.close();
+              try { broadcaster.close(); } catch(e) {}
             }
             broadcaster = ws;
             console.log('Broadcaster successfully registered.');
@@ -38,15 +49,15 @@ wss.on('connection', (ws) => {
             // If viewer is already waiting, notify the broadcaster to start connection
             if (viewer) {
               console.log('Viewer is already connected. Triggering offer generation.');
-              broadcaster.send(JSON.stringify({ type: 'viewer-ready' }));
-              viewer.send(JSON.stringify({ type: 'status', message: 'Broadcaster is active. Connecting...' }));
+              safeSend(broadcaster, { type: 'viewer-ready' });
+              safeSend(viewer, { type: 'status', message: 'Broadcaster is active. Connecting...' });
             } else {
-              ws.send(JSON.stringify({ type: 'status', message: 'Registered as Broadcaster. Waiting for viewer...' }));
+              safeSend(ws, { type: 'status', message: 'Registered as Broadcaster. Waiting for viewer...' });
             }
           } else if (userRole === 'viewer') {
             if (viewer) {
               console.log('Viewer re-registered. Disconnecting old viewer.');
-              viewer.close();
+              try { viewer.close(); } catch(e) {}
             }
             viewer = ws;
             console.log('Viewer successfully registered.');
@@ -54,10 +65,10 @@ wss.on('connection', (ws) => {
             // If broadcaster is available, notify the broadcaster to initiate WebRTC negotiation
             if (broadcaster) {
               console.log('Broadcaster is active. Prompting broadcaster to start offer.');
-              broadcaster.send(JSON.stringify({ type: 'viewer-ready' }));
-              ws.send(JSON.stringify({ type: 'status', message: 'Connecting to Broadcaster...' }));
+              safeSend(broadcaster, { type: 'viewer-ready' });
+              safeSend(ws, { type: 'status', message: 'Connecting to Broadcaster...' });
             } else {
-              ws.send(JSON.stringify({ type: 'status', message: 'Waiting for Broadcaster to go live...' }));
+              safeSend(ws, { type: 'status', message: 'Waiting for Broadcaster to go live...' });
             }
           }
           break;
@@ -66,7 +77,7 @@ wss.on('connection', (ws) => {
           // Relay offer from broadcaster to viewer
           if (ws === broadcaster && viewer) {
             console.log('Relaying SDP Offer to Viewer.');
-            viewer.send(JSON.stringify({ type: 'offer', sdp: data.sdp }));
+            safeSend(viewer, { type: 'offer', sdp: data.sdp });
           } else {
             console.warn('Received offer but no viewer is connected, or sender is not broadcaster.');
           }
@@ -76,7 +87,7 @@ wss.on('connection', (ws) => {
           // Relay answer from viewer to broadcaster
           if (ws === viewer && broadcaster) {
             console.log('Relaying SDP Answer to Broadcaster.');
-            broadcaster.send(JSON.stringify({ type: 'answer', sdp: data.sdp }));
+            safeSend(broadcaster, { type: 'answer', sdp: data.sdp });
           } else {
             console.warn('Received answer but no broadcaster is connected, or sender is not viewer.');
           }
@@ -86,11 +97,11 @@ wss.on('connection', (ws) => {
           // Relay ICE candidate to the opposite party
           if (ws === broadcaster) {
             if (viewer) {
-              viewer.send(JSON.stringify({ type: 'candidate', candidate: data.candidate }));
+              safeSend(viewer, { type: 'candidate', candidate: data.candidate });
             }
           } else if (ws === viewer) {
             if (broadcaster) {
-              broadcaster.send(JSON.stringify({ type: 'candidate', candidate: data.candidate }));
+              safeSend(broadcaster, { type: 'candidate', candidate: data.candidate });
             }
           }
           break;
@@ -108,13 +119,13 @@ wss.on('connection', (ws) => {
       console.log('Broadcaster disconnected.');
       broadcaster = null;
       if (viewer) {
-        viewer.send(JSON.stringify({ type: 'broadcaster-left' }));
+        safeSend(viewer, { type: 'broadcaster-left' });
       }
     } else if (ws === viewer) {
       console.log('Viewer disconnected.');
       viewer = null;
       if (broadcaster) {
-        broadcaster.send(JSON.stringify({ type: 'viewer-left' }));
+        safeSend(broadcaster, { type: 'viewer-left' });
       }
     }
   });
