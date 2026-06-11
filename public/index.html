@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AetherStream - P2P WebRTC Camera Share</title>
+  <!-- Google Fonts for premium appearance -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="logo-icon">
+          <path d="M23 7a2 2 0 0 0-2.45-1.45L16 7V5a2 2 0 0 0-2-2H2a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2l4.55 1.45A2 2 0 0 0 23 17V7z"/>
+        </svg>
+        <span>Aether<span class="highlight">Stream</span></span>
+      </div>
+      <div class="badge" id="role-badge" style="display: none;">Initialized</div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      
+      <!-- Screen 1: Role Selector -->
+      <section id="role-selection" class="section active fade-in">
+        <div class="welcome-text">
+          <h1>P2P Camera Streaming</h1>
+          <p>Instantly stream your laptop's camera directly to a mobile device or another browser peer-to-peer using high-performance WebRTC.</p>
+        </div>
+        <div class="cards-grid">
+          <!-- Card: Broadcaster (Host) -->
+          <div class="card selector-card" onclick="selectRole('broadcaster')">
+            <div class="card-icon-wrapper host-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <circle cx="12" cy="12" r="3" fill="currentColor"></circle>
+              </svg>
+            </div>
+            <h2>Start Broadcast</h2>
+            <p>Capture your laptop's camera and stream it to a connected peer.</p>
+            <button class="btn btn-primary">Select Host</button>
+          </div>
+
+          <!-- Card: Viewer -->
+          <div class="card selector-card" onclick="selectRole('viewer')">
+            <div class="card-icon-wrapper viewer-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+            </div>
+            <h2>Join Stream</h2>
+            <p>Receive and view the laptop's live video feed on this browser.</p>
+            <button class="btn btn-secondary">Select Viewer</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 2: Broadcaster Interface -->
+      <section id="broadcaster-ui" class="section fade-in">
+        <div class="dashboard-layout">
+          <!-- Left: Video Panel -->
+          <div class="panel video-panel">
+            <div class="panel-header">
+              <div class="status-indicator">
+                <span class="pulse-dot idle" id="host-pulse"></span>
+                <span class="status-text" id="host-status">Starting camera...</span>
+              </div>
+            </div>
+            <div class="video-wrapper">
+              <video id="local-video" autoplay playsinline muted></video>
+              <div class="video-placeholder" id="local-placeholder">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M23 7a2 2 0 0 0-2.45-1.45L16 7V5a2 2 0 0 0-2-2H2a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2l4.55 1.45A2 2 0 0 0 23 17V7z"/>
+                </svg>
+                <p>Grant camera access to start broadcasting</p>
+              </div>
+            </div>
+            <div class="controls-bar">
+              <button class="control-btn" id="toggle-video" title="Toggle Video">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-on">
+                  <path d="M23 7a2 2 0 0 0-2.45-1.45L16 7V5a2 2 0 0 0-2-2H2a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2l4.55 1.45A2 2 0 0 0 23 17V7z"/>
+                </svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-off" style="display: none;">
+                  <path d="M16 16v1a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2m5.66 0H14a2 2 0 0 1 2 2v3.34M23 7l-7 5 7 5V7zM1 1l22 22"/>
+                </svg>
+              </button>
+              <button class="control-btn" id="toggle-audio" title="Toggle Audio">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-on">
+                  <path d="M12 1v22M17 5v14M22 9v6M7 9v6M2 5v14"/>
+                </svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-off" style="display: none;">
+                  <path d="M1 1l22 22M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/>
+                  <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Right: Connection Sharing Panel -->
+          <div class="panel info-panel">
+            <h3>Invite Viewer</h3>
+            <p class="description">Scan this QR code with your phone or copy the URL below to watch this camera feed live.</p>
+            
+            <div class="qr-container">
+              <div class="qr-code" id="qr-code-wrapper">
+                <div class="qr-placeholder">Generating QR Code...</div>
+              </div>
+            </div>
+
+            <div class="link-sharing">
+              <input type="text" id="share-url" readonly value="Detecting server URL...">
+              <button class="btn btn-secondary btn-sm" id="copy-btn">Copy Link</button>
+            </div>
+            
+            <div class="system-logs">
+              <h4>System Events</h4>
+              <div class="logs-feed" id="host-logs">
+                <div class="log-entry system">Broadcaster dashboard initialized.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 3: Viewer Interface -->
+      <section id="viewer-ui" class="section fade-in">
+        <div class="viewer-layout">
+          <div class="panel video-panel viewer-main-panel">
+            <div class="panel-header">
+              <div class="status-indicator">
+                <span class="pulse-dot idle" id="viewer-pulse"></span>
+                <span class="status-text" id="viewer-status">Connecting to server...</span>
+              </div>
+            </div>
+            
+            <div class="video-wrapper">
+              <video id="remote-video" playsinline></video>
+              <div class="video-placeholder" id="viewer-placeholder">
+                <div class="spinner"></div>
+                <p id="viewer-placeholder-text">Establishing connection...</p>
+              </div>
+            </div>
+
+            <div class="controls-bar">
+              <button class="control-btn" id="viewer-play" title="Play Video" disabled>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+              </button>
+              <button class="control-btn" id="viewer-mute" title="Mute Audio">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-on">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                </svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="icon-off" style="display: none;">
+                  <path d="M23 9l-6 6M17 9l6 6M12 5L7 9H3v6h4l5 4V5z"/>
+                </svg>
+              </button>
+              <button class="control-btn" id="viewer-fullscreen" title="Fullscreen">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+          
+          <div class="panel log-panel-mobile">
+            <div class="system-logs">
+              <h4>Connection Status</h4>
+              <div class="logs-feed" id="viewer-logs">
+                <div class="log-entry system">Viewer console initialized.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>Secure peer-to-peer streaming via WebRTC & WebSockets</p>
+    </footer>
+  </div>
+
+  <script src="client.js"></script>
+</body>
+</html>
